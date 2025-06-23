@@ -149,7 +149,6 @@ export default function Post({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem>Share post</DropdownMenuItem>
-              <DropdownMenuItem>Copy link</DropdownMenuItem>
               {ownPost && (
                 <>
                   <DropdownMenuSeparator />

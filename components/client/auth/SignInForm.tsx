@@ -35,7 +35,6 @@ export default function SignInForm() {
   function onSubmit(values: z.infer<typeof signInFormSchema>) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const isEmail = emailRegex.test(values.identifier);
-
     if (isEmail) {
       authClient.signIn.email({
         email: values.identifier,

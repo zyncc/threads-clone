@@ -48,7 +48,7 @@ export default function AppCollapsedSidebar() {
         <Link href={"/search"}>
           <Search className="shrink-0" />
         </Link>
-        <CreatePostDropzone />
+        {/* <CreatePostDropzone /> */}
         <Link href={"/messages"}>
           <MessageCircle className="shrink-0" />
         </Link>
@@ -143,12 +143,10 @@ export default function AppCollapsedSidebar() {
                     Saved
                   </DropdownMenuItem>
                 </Link>
-                <Link href="/settings">
-                  <DropdownMenuItem>
-                    <Settings />
-                    Settings
-                  </DropdownMenuItem>
-                </Link>
+                <DropdownMenuItem>
+                  <Settings />
+                  Settings
+                </DropdownMenuItem>
                 <Button
                   className="flex w-full justify-start p-0 text-left"
                   variant={"ghost"}

@@ -21,10 +21,8 @@ import Post from "@/components/ui/post";
 
 export default async function AccountPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const session = await getServerSession();
   if (!session) {
@@ -32,14 +30,9 @@ export default async function AccountPage({
   }
 
   const username = (await params).username.split("%40")[1];
-  const tab = (await searchParams).tab || "posts";
-
-  if (tab !== "posts" && tab !== "saved") {
-    return notFound();
-  }
 
   const userDetails = await db.query.user.findFirst({
-    where: eq(user.username, username),
+    where: eq(user.username, `${username}`),
     with: {
       followers: true,
       posts: {
@@ -163,15 +156,19 @@ export default async function AccountPage({
         </div>
       </div>
       <div>
-        <Tabs defaultValue={tab as string}>
-          <TabsList className="mx-auto w-full max-w-3xl">
-            <TabsTrigger value="posts">
-              <ImageIcon /> Posts
-            </TabsTrigger>
-            <TabsTrigger value="saved">
-              <Bookmark /> Saved
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="posts">
+          {session.user.username == userDetails.username && (
+            <>
+              <TabsList className="mx-auto w-full max-w-3xl">
+                <TabsTrigger value="posts">
+                  <ImageIcon /> Posts
+                </TabsTrigger>
+                <TabsTrigger value="saved">
+                  <Bookmark /> Saved
+                </TabsTrigger>
+              </TabsList>
+            </>
+          )}
           <TabsContent value="posts">
             <div className="my-10 flex flex-col gap-5">
               {userDetails?.posts.map((post) => (
@@ -183,7 +180,7 @@ export default async function AccountPage({
                   following={userDetails.following}
                   comments={post.comments}
                   savedPost={userDetails.savedPosts}
-                  ownPost
+                  ownPost={session.user.username == userDetails.username}
                 />
               ))}
             </div>
