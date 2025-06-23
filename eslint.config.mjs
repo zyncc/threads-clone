@@ -13,13 +13,15 @@ const eslintConfig = [
   ...compat.config({
     extends: ["next/core-web-vitals", "next/typescript", "prettier"],
     rules: {
+      "no-unused-vars": "warn",
+      "@typescript-eslint/no-unused-vars": "warn",
       "prefer-template": ["error"],
       "prefer-arrow-callback": ["error"],
       quotes: ["error", "double"],
       "@typescript-eslint/consistent-type-imports": [
         "warn",
         {
-          prefer: "type-imports",    
+          prefer: "type-imports",
           fixStyle: "inline-type-imports",
         },
       ],

@@ -99,7 +99,7 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <Link href={"/account"}>
+              <Link href={`/@${username}`}>
                 <DropdownMenuItem>
                   <BadgeCheck />
                   Account
@@ -109,7 +109,7 @@ export function NavUser({
                 <Bell />
                 Notifications
               </DropdownMenuItem>
-              <Link href={"/account?tab=saved"}>
+              <Link href={`/@${username}?tab=saved`}>
                 <DropdownMenuItem>
                   <Bookmark />
                   Saved

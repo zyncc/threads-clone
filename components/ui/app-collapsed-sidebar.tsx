@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { useSidebar } from "./sidebar";
 import { authClient } from "@/lib/auth-client";
 import CreatePostDropzone from "../create-post-dropzone";
+import { SiThreads } from "react-icons/si";
 
 export default function AppCollapsedSidebar() {
   const { isMobile } = useSidebar();
@@ -59,39 +60,40 @@ export default function AppCollapsedSidebar() {
         </Avatar>
       </div>
       {/* DESKTOP ONLY SIDEBAR */}
-      <div className="bg-sidebar sticky top-0 bottom-0 left-0 z-50 hidden h-screen w-12 flex-col justify-between min-md:flex">
-        <div className="mt-5 flex h-full flex-col items-center justify-start gap-7">
+      <div className="bg-background sticky top-0 bottom-0 left-0 z-50 hidden h-screen w-16 flex-col items-center justify-evenly min-md:flex">
+        <SiThreads size={30} className="mt-5" />
+        <div className="flex h-full flex-col items-center justify-center gap-7">
           <Link href={"/"}>
             <Button variant={"ghost"} size={"icon"}>
-              <Home className="size-5" />
+              <Home className="size-7" />
             </Button>
           </Link>
           <Link href={"/search"}>
             <Button variant={"ghost"} size={"icon"}>
-              <Search className="size-5" />
+              <Search className="size-7" />
             </Button>
           </Link>
           <Link href={"/explore"}>
             <Button variant={"ghost"} size={"icon"}>
-              <Compass className="size-5" />
+              <Compass className="size-7" />
             </Button>
           </Link>
           <CreatePostDropzone />
           <Link href={"/messages"}>
             <Button variant={"ghost"} size={"icon"}>
-              <MessageCircle className="size-5" />
+              <MessageCircle className="size-7" />
             </Button>
           </Link>
         </div>
-        <div className="mb-5 flex h-full items-end justify-center">
+        <div className="mb-5 flex">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Avatar className="h-8 w-8 rounded-lg">
+              <Avatar className="h-8 w-8 rounded-full">
                 <AvatarImage
                   src={session?.user.image ?? undefined}
                   alt={session?.user.name ?? ""}
                 />
-                <AvatarFallback className="rounded-lg select-none">
+                <AvatarFallback className="rounded-full select-none">
                   {isPending ? "L" : session?.user.name?.[0]}
                 </AvatarFallback>
               </Avatar>
@@ -104,7 +106,7 @@ export default function AppCollapsedSidebar() {
             >
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                  <Avatar className="h-8 w-8 rounded-lg">
+                  <Avatar className="h-8 w-8 rounded-full">
                     <AvatarImage
                       src={session?.user.image ?? undefined}
                       alt={session?.user.name}
@@ -125,7 +127,7 @@ export default function AppCollapsedSidebar() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <Link href={"/account"}>
+                <Link href={`/@${session?.user.username}`}>
                   <DropdownMenuItem>
                     <BadgeCheck />
                     Account
@@ -135,7 +137,7 @@ export default function AppCollapsedSidebar() {
                   <Bell />
                   Notifications
                 </DropdownMenuItem>
-                <Link href={"/account?tab=saved"}>
+                <Link href={`/@${session?.user.username}?tab=saved`}>
                   <DropdownMenuItem>
                     <Bookmark />
                     Saved
