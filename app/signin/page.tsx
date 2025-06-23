@@ -21,7 +21,7 @@ async function SuspenseWrapper() {
       <div className="flex h-full w-full flex-1 basis-1/2 items-center justify-center">
         <h1 className="text-h1">
           Welcome to <br />
-          Instagram
+          Threads
         </h1>
       </div>
       <div className="bg-muted flex h-full w-full flex-1 basis-1/2 flex-col items-center justify-center">

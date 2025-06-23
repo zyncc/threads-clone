@@ -4,11 +4,18 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import db from "./lib/db";
+import { nanoid } from "nanoid";
 
 export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  advanced: {
+    database: {
+      generateId: () => nanoid(12),
+    },
+  },
+
   logger: {
     disabled: false,
     level: "error",
@@ -20,8 +27,9 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      username: {
+      bio: {
         type: "string",
+        required: false,
       },
     },
   },

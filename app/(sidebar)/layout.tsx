@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import AppCollapsedSidebar from "@/components/ui/app-collapsed-sidebar";
 
 export const metadata: Metadata = {
-  title: "Instagram Clone",
-  description: "Instagram Clone",
+  title: "Threads Clone",
+  description: "Threads Clone",
 };
 
 export default async function RootLayout({
@@ -14,7 +14,7 @@ export default async function RootLayout({
 }>) {
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppCollapsedSidebar />
       {children}
     </SidebarProvider>
   );

@@ -32,9 +32,18 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 
-export function NavUser() {
+export function NavUser({
+  name,
+  image,
+  username,
+  isPending,
+}: {
+  name: string | undefined;
+  image: string | undefined;
+  username: string | undefined;
+  isPending: boolean;
+}) {
   const { isMobile } = useSidebar();
-  const { data: session, isPending } = authClient.useSession();
   const router = useRouter();
   const theme = useTheme();
 
@@ -48,20 +57,17 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage
-                  src={session?.user?.image ?? undefined}
-                  alt={session?.user.name}
-                />
+                <AvatarImage src={image ?? undefined} alt={name ?? ""} />
                 <AvatarFallback className="rounded-lg">
-                  {isPending ? "L" : session?.user.name[0]}
+                  {isPending ? "L" : name?.[0]}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">
-                  {isPending ? "Loading.." : session?.user.name}
+                  {isPending ? "Loading.." : name}
                 </span>
                 <span className="truncate text-xs">
-                  {isPending ? "Loading.." : `@${session?.user.username}`}
+                  {isPending ? "Loading.." : `@${username}`}
                 </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
@@ -76,20 +82,17 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage
-                    src={session?.user?.image ?? undefined}
-                    alt={session?.user.name}
-                  />
+                  <AvatarImage src={image ?? undefined} alt={name} />
                   <AvatarFallback className="rounded-lg">
-                    {isPending ? "L" : session?.user.name[0]}
+                    {isPending ? "L" : name?.[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">
-                    {isPending ? "Loading.." : session?.user.name}
+                    {isPending ? "Loading.." : name}
                   </span>
                   <span className="truncate text-xs">
-                    {isPending ? "Loading.." : `@${session?.user.username}`}
+                    {isPending ? "Loading.." : `@${username}`}
                   </span>
                 </div>
               </div>
@@ -106,7 +109,7 @@ export function NavUser() {
                 <Bell />
                 Notifications
               </DropdownMenuItem>
-              <Link href={"/saved"}>
+              <Link href={"/account?tab=saved"}>
                 <DropdownMenuItem>
                   <Bookmark />
                   Saved

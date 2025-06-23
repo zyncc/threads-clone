@@ -2,15 +2,10 @@
 
 import {
   AlertCircleIcon,
-  FileArchiveIcon,
-  FileIcon,
-  FileSpreadsheetIcon,
-  FileTextIcon,
-  HeadphonesIcon,
   ImageIcon,
-  Trash2Icon,
+  LoaderCircle,
+  Plus,
   UploadIcon,
-  VideoIcon,
   XIcon,
 } from "lucide-react";
 
@@ -24,101 +19,28 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-
-const getFileIcon = (file: { file: File | { type: string; name: string } }) => {
-  const fileType = file.file instanceof File ? file.file.type : file.file.type;
-  const fileName = file.file instanceof File ? file.file.name : file.file.name;
-
-  const iconMap = {
-    pdf: {
-      icon: FileTextIcon,
-      conditions: (type: string, name: string) =>
-        type.includes("pdf") ||
-        name.endsWith(".pdf") ||
-        type.includes("word") ||
-        name.endsWith(".doc") ||
-        name.endsWith(".docx"),
-    },
-    archive: {
-      icon: FileArchiveIcon,
-      conditions: (type: string, name: string) =>
-        type.includes("zip") ||
-        type.includes("archive") ||
-        name.endsWith(".zip") ||
-        name.endsWith(".rar"),
-    },
-    excel: {
-      icon: FileSpreadsheetIcon,
-      conditions: (type: string, name: string) =>
-        type.includes("excel") ||
-        name.endsWith(".xls") ||
-        name.endsWith(".xlsx"),
-    },
-    video: {
-      icon: VideoIcon,
-      conditions: (type: string) => type.includes("video/"),
-    },
-    audio: {
-      icon: HeadphonesIcon,
-      conditions: (type: string) => type.includes("audio/"),
-    },
-    image: {
-      icon: ImageIcon,
-      conditions: (type: string) => type.startsWith("image/"),
-    },
-  };
-
-  for (const { icon: Icon, conditions } of Object.values(iconMap)) {
-    if (conditions(fileType, fileName)) {
-      return <Icon className="size-5 opacity-60" />;
-    }
-  }
-
-  return <FileIcon className="size-5 opacity-60" />;
-};
-
-const getFilePreview = (file: {
-  file: File | { type: string; name: string; url?: string };
-}) => {
-  const fileType = file.file instanceof File ? file.file.type : file.file.type;
-  const fileName = file.file instanceof File ? file.file.name : file.file.name;
-
-  const renderImage = (src: string) => (
-    <img
-      src={src}
-      alt={fileName}
-      className="size-full rounded-t-[inherit] object-cover"
-    />
-  );
-
-  return (
-    <div className="bg-accent flex aspect-square items-center justify-center overflow-hidden rounded-t-[inherit]">
-      {fileType.startsWith("image/") ? (
-        file.file instanceof File ? (
-          (() => {
-            const previewUrl = URL.createObjectURL(file.file);
-            return renderImage(previewUrl);
-          })()
-        ) : file.file.url ? (
-          renderImage(file.file.url)
-        ) : (
-          <ImageIcon className="size-5 opacity-60" />
-        )
-      ) : (
-        getFileIcon(file)
-      )}
-    </div>
-  );
-};
+import { Textarea } from "./ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function CreatePostDropzone() {
   const maxSizeMB = 2;
   const maxSize = maxSizeMB * 1024 * 1024;
-  const maxFiles = 6;
+  const maxFiles = 5;
+
+  const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [
     { files, isDragging, errors },
@@ -140,140 +62,194 @@ export default function CreatePostDropzone() {
   });
 
   const formSchema = z.object({
-    username: z.string().min(2, {
-      message: "Username must be at least 2 characters.",
-    }),
+    description: z
+      .string()
+      .min(2, {
+        message: "Description must be at least 2 characters.",
+      })
+      .max(400, {
+        message: "Description must be at most 400 characters.",
+      })
+      .trim(),
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      description: "",
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true);
+    const postData = new FormData();
+    if (files.length > 0) {
+      files.forEach((file) => {
+        postData.append("files", file.file as File);
+      });
+    }
+    postData.append("description", values.description);
+
+    const response = await fetch("/api/post", {
+      method: "POST",
+      body: postData,
+    });
+
+    if ((await response.json()).status == 500) {
+      toast.error("Failed to create post");
+      setIsLoading(false);
+      form.reset();
+      clearFiles();
+      return;
+    }
+    setIsLoading(false);
+    form.reset();
+    clearFiles();
+    toast.success("Post created successfully");
+    setOpen(false);
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Title</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Title"
-                    className="shadow-none"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </form>
-      </Form>
-      {/* Drop area */}
-      <div
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        data-dragging={isDragging || undefined}
-        data-files={files.length > 0 || undefined}
-        className="border-input data-[dragging=true]:bg-accent/50 has-[input:focus]:border-ring has-[input:focus]:ring-ring/50 relative flex min-h-52 flex-col items-center overflow-hidden rounded-xl border border-dashed p-4 transition-colors not-data-[files]:justify-center has-[input:focus]:ring-[3px]"
-      >
-        <input
-          {...getInputProps()}
-          className="sr-only"
-          aria-label="Upload image file"
-        />
-        {files.length > 0 ? (
-          <div className="flex w-full flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="truncate text-sm font-medium">
-                Files ({files.length})
-              </h3>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={openFileDialog}>
-                  <UploadIcon
-                    className="-ms-0.5 size-3.5 opacity-60"
-                    aria-hidden="true"
-                  />
-                  Add files
-                </Button>
-                <Button variant="outline" size="sm" onClick={clearFiles}>
-                  <Trash2Icon
-                    className="-ms-0.5 size-3.5 opacity-60"
-                    aria-hidden="true"
-                  />
-                  Remove all
-                </Button>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Plus className="shrink-0" />
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Create Post</AlertDialogTitle>
+        </AlertDialogHeader>
+        <div className="flex flex-col gap-2">
+          <Form {...form}>
+            <form
+              id="create-post-form"
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+            >
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea
+                        placeholder="What's on your mind?"
+                        className="max-h-[300px] shadow-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+          <div
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            data-dragging={isDragging || undefined}
+            data-files={files.length > 0 || undefined}
+            className="border-input data-[dragging=true]:bg-accent/50 has-[input:focus]:border-ring has-[input:focus]:ring-ring/50 relative flex min-h-52 flex-col items-center overflow-hidden rounded-xl border border-dashed p-4 transition-colors not-data-[files]:justify-center has-[input:focus]:ring-[3px]"
+          >
+            <input
+              {...getInputProps()}
+              className="sr-only"
+              aria-label="Upload image file"
+            />
+            <div className="flex flex-col items-center justify-center px-4 py-3 text-center">
+              <div
+                className="bg-background mb-2 flex size-11 shrink-0 items-center justify-center rounded-full border"
+                aria-hidden="true"
+              >
+                <ImageIcon className="size-4 opacity-60" />
               </div>
+              <p className="mb-1.5 text-sm font-medium">
+                Drop your images here
+              </p>
+              <p className="text-muted-foreground text-xs">
+                SVG, PNG, JPG or GIF (max. {maxSizeMB}MB)
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={openFileDialog}
+              >
+                <UploadIcon className="-ms-1 opacity-60" aria-hidden="true" />
+                Select images
+              </Button>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          {errors.length > 0 && (
+            <div
+              className="text-destructive flex items-center gap-1 text-xs"
+              role="alert"
+            >
+              <AlertCircleIcon className="size-3 shrink-0" />
+              <span>{errors[0]}</span>
+            </div>
+          )}
+
+          {/* File list */}
+          {files.length > 0 && (
+            <div className="space-y-2">
               {files.map((file) => (
                 <div
                   key={file.id}
-                  className="bg-background relative flex flex-col rounded-md border"
+                  className="bg-background flex items-center justify-between gap-2 rounded-lg border p-2 pe-3"
                 >
-                  {getFilePreview(file)}
-                  <Button
-                    onClick={() => removeFile(file.id)}
-                    size="icon"
-                    className="border-background focus-visible:border-background absolute -top-2 -right-2 size-6 rounded-full border-2 shadow-none"
-                    aria-label="Remove image"
-                  >
-                    <XIcon className="size-3.5" />
-                  </Button>
-                  <div className="flex min-w-0 flex-col gap-0.5 border-t p-3">
-                    <p className="truncate text-[13px] font-medium">
-                      {file.file.name}
-                    </p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {formatBytes(file.file.size)}
-                    </p>
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="bg-accent aspect-square shrink-0 rounded">
+                      <img
+                        src={file.preview}
+                        alt={file.file.name}
+                        className="size-10 rounded-[inherit] object-cover"
+                      />
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <p className="truncate text-[13px] font-medium">
+                        {file.file.name}
+                      </p>
+                      <p className="text-muted-foreground text-xs">
+                        {formatBytes(file.file.size)}
+                      </p>
+                    </div>
                   </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-muted-foreground/80 hover:text-foreground -me-2 size-8 hover:bg-transparent"
+                    onClick={() => removeFile(file.id)}
+                    aria-label="Remove file"
+                  >
+                    <XIcon aria-hidden="true" />
+                  </Button>
                 </div>
               ))}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center px-4 py-3 text-center">
-            <div
-              className="bg-background mb-2 flex size-11 shrink-0 items-center justify-center rounded-full border"
-              aria-hidden="true"
-            >
-              <ImageIcon className="size-4 opacity-60" />
-            </div>
-            <p className="mb-1.5 text-sm font-medium">Drop your files here</p>
-            <p className="text-muted-foreground text-xs">
-              Max {maxFiles} files ∙ Up to {maxSizeMB}MB
-            </p>
-            <Button variant="outline" className="mt-4" onClick={openFileDialog}>
-              <UploadIcon className="-ms-1 opacity-60" aria-hidden="true" />
-              Select images
-            </Button>
-          </div>
-        )}
-      </div>
 
-      {errors.length > 0 && (
-        <div
-          className="text-destructive flex items-center gap-1 text-xs"
-          role="alert"
-        >
-          <AlertCircleIcon className="size-3 shrink-0" />
-          <span>{errors[0]}</span>
+              {/* Remove all files button */}
+              {files.length > 1 && (
+                <div>
+                  <Button size="sm" variant="outline" onClick={clearFiles}>
+                    Remove all files
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+          <Button disabled={isLoading} type="submit" form="create-post-form">
+            {isLoading ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              "Post"
+            )}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
