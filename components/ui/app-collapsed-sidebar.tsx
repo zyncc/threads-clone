@@ -43,44 +43,54 @@ export default function AppCollapsedSidebar() {
       {/* MOBILE ONLY BOTTOM TABS */}
       <div className="bg-background fixed right-0 bottom-0 left-0 z-50 flex w-full items-center justify-between gap-x-5 px-5 py-3 min-md:hidden">
         <Link href={"/"}>
-          <Home className="shrink-0" />
+          <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
+            <Home className="size-6" />
+          </Button>
         </Link>
-        <Link href={"/search"}>
-          <Search className="shrink-0" />
+        <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
+          <Link href={"/search"}>
+            <Search className="size-6" />
+          </Link>
+        </Button>
+        <CreatePostDropzone />
+        <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
+          <Link href={"/messages"}>
+            <MessageCircle className="size-6" />
+          </Link>
+        </Button>
+        <Link href={`/@${session?.user.username}`}>
+          <Avatar>
+            <AvatarImage src={session?.user?.image ?? undefined} />
+            <AvatarFallback className="rounded-lg">
+              {isPending ? "L" : session?.user?.name?.[0]}
+            </AvatarFallback>
+          </Avatar>
         </Link>
-        {/* <CreatePostDropzone /> */}
-        <Link href={"/messages"}>
-          <MessageCircle className="shrink-0" />
-        </Link>
-        <Avatar>
-          <AvatarImage src={session?.user?.image ?? undefined} />
-          <AvatarFallback className="rounded-lg">
-            {isPending ? "L" : session?.user?.name?.[0]}
-          </AvatarFallback>
-        </Avatar>
       </div>
       {/* DESKTOP ONLY SIDEBAR */}
-      <div className="bg-background sticky top-0 bottom-0 left-0 z-50 hidden h-screen w-16 flex-col items-center justify-evenly min-md:flex">
-        <SiThreads size={30} className="mt-5" />
+      <div className="bg-background sticky top-0 bottom-0 left-0 z-50 hidden h-screen w-16 flex-col items-center justify-center min-md:flex">
+        <Link href={"/"}>
+          <SiThreads size={30} className="mt-5 cursor-pointer" />
+        </Link>
         <div className="flex h-full flex-col items-center justify-center gap-7">
           <Link href={"/"}>
-            <Button variant={"ghost"} size={"icon"}>
+            <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
               <Home className="size-7" />
             </Button>
           </Link>
           <Link href={"/search"}>
-            <Button variant={"ghost"} size={"icon"}>
+            <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
               <Search className="size-7" />
             </Button>
           </Link>
           <Link href={"/explore"}>
-            <Button variant={"ghost"} size={"icon"}>
+            <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
               <Compass className="size-7" />
             </Button>
           </Link>
           <CreatePostDropzone />
           <Link href={"/messages"}>
-            <Button variant={"ghost"} size={"icon"}>
+            <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
               <MessageCircle className="size-7" />
             </Button>
           </Link>

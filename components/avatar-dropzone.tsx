@@ -115,7 +115,7 @@ export default function Component() {
                   const formData = new FormData();
                   formData.append("avatar", files[0].file as File);
                   formData.append("crop", JSON.stringify(cropData));
-                  const getAvatar = await fetch("/api/user-avatar", {
+                  const getAvatar = await fetch("/api/user/avatar", {
                     method: "POST",
                     body: formData,
                   });

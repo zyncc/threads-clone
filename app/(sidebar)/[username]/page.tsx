@@ -7,17 +7,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { user } from "@/db/schema";
-import db from "@/lib/db";
-import { getServerSession } from "@/lib/get-server-session";
-import { eq } from "drizzle-orm";
+import { prisma } from "@/lib/prisma";
 import { Bookmark, Image as ImageIcon } from "lucide-react";
-
 import { notFound, redirect } from "next/navigation";
 import React from "react";
 import AvatarDropzone from "@/components/avatar-dropzone";
 import AccountPageDropdown from "@/components/client/account-page-dropdown";
 import Post from "@/components/ui/post";
+import { getServerSession } from "@/lib/get-server-session";
 
 export default async function AccountPage({
   params,
@@ -31,39 +28,94 @@ export default async function AccountPage({
 
   const username = (await params).username.split("%40")[1];
 
-  const userDetails = await db.query.user.findFirst({
-    where: eq(user.username, `${username}`),
-    with: {
-      followers: true,
-      posts: {
-        limit: 20,
-        with: {
-          comments: {
-            orderBy: (comment, { desc }) => [desc(comment.createdAt)],
+  const userDetails = await prisma.user.findUnique({
+    where: {
+      username,
+    },
+    include: {
+      Post: {
+        include: {
+          savedBy: {
+            select: {
+              userId: true,
+              id: true,
+            },
+            where: {
+              userId: session?.user.id,
+            },
           },
-          likes: {
-            orderBy: (like, { desc }) => [desc(like.createdAt)],
+          user: {
+            include: {
+              followers: {
+                where: {
+                  followerId: session?.user.id,
+                },
+              },
+            },
+          },
+          comments: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                  username: true,
+                },
+              },
+            },
+            take: 20,
           },
         },
-        orderBy: (post, { desc }) => [desc(post.createdAt)],
+        take: 20,
+        orderBy: {
+          createdAt: "desc",
+        },
       },
-      savedPosts: {
-        limit: 20,
-        with: {
+      savedPost: {
+        include: {
           post: {
-            with: {
-              user: true,
-              comments: {
-                orderBy: (comment, { desc }) => [desc(comment.createdAt)],
+            include: {
+              savedBy: {
+                select: {
+                  userId: true,
+                  id: true,
+                },
+                where: {
+                  userId: session?.user.id,
+                },
               },
-              likes: {
-                orderBy: (like, { desc }) => [desc(like.createdAt)],
+              user: {
+                include: {
+                  followers: {
+                    where: {
+                      followerId: session?.user.id,
+                    },
+                  },
+                },
+              },
+              comments: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      image: true,
+                      username: true,
+                    },
+                  },
+                },
+                take: 20,
               },
             },
           },
         },
-        orderBy: (savedPost, { desc }) => [desc(savedPost.createdAt)],
+        take: 20,
+        orderBy: {
+          createdAt: "desc",
+        },
       },
+      followers: true,
       following: true,
     },
   });
@@ -117,19 +169,6 @@ export default async function AccountPage({
         )}
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center">
-            <div className="flex -space-x-1">
-              {userDetails.followers.map((follower, index) => (
-                <Avatar key={index} className="h-6 w-6 border-2 border-black">
-                  <AvatarImage
-                    src={userDetails.image!}
-                    alt={`Follower ${index + 1}`}
-                  />
-                  <AvatarFallback className="bg-gray-700 text-xs">
-                    U
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
             <Dialog>
               <DialogTrigger asChild>
                 <p className="cursor-pointer underline-offset-2 hover:underline">
@@ -171,34 +210,48 @@ export default async function AccountPage({
           )}
           <TabsContent value="posts">
             <div className="my-10 flex flex-col gap-5">
-              {userDetails?.posts.map((post) => (
+              {userDetails?.Post.map((post) => (
                 <Post
                   key={post.id}
-                  user={userDetails}
+                  user={post.user}
                   post={post}
-                  likes={post.likes}
-                  following={userDetails.following}
                   comments={post.comments}
-                  savedPost={userDetails.savedPosts}
-                  ownPost={session.user.username == userDetails.username}
+                  savedPost={{
+                    saved: post.savedBy[0]?.userId === session?.user.id,
+                    id: post.savedBy[0]?.id,
+                  }}
+                  following={
+                    post.user.followers[0]?.followerId === session?.user.id
+                  }
+                  ownPost={post.userId === session?.user.id}
                 />
               ))}
             </div>
           </TabsContent>
           <TabsContent value="saved">
-            {userDetails.savedPosts.length > 0 ? (
+            {userDetails.savedPost.length > 0 ? (
               <div className="my-10 flex flex-col gap-5">
-                {userDetails.savedPosts.map((savedPost) => (
-                  <Post
-                    key={savedPost.id}
-                    user={savedPost.post!.user!}
-                    post={savedPost.post!}
-                    likes={savedPost.post!.likes}
-                    following={userDetails.following}
-                    comments={savedPost.post!.comments}
-                    savedPost={userDetails.savedPosts}
-                  />
-                ))}
+                {userDetails.savedPost.map((post) => {
+                  if (!post.post || !post.post.user) return null;
+                  return (
+                    <Post
+                      key={post.id}
+                      user={post.post.user}
+                      post={post.post}
+                      comments={post.post.comments ?? []}
+                      savedPost={{
+                        saved:
+                          post.post.savedBy?.[0]?.userId === session?.user.id,
+                        id: post.post.savedBy?.[0]?.id,
+                      }}
+                      following={
+                        post.post.user.followers?.[0]?.followerId ===
+                        session?.user.id
+                      }
+                      ownPost={post.post.userId === session?.user.id}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <div className="mx-auto my-10 flex items-center justify-center">

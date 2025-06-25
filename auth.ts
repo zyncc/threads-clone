@@ -1,10 +1,9 @@
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-// import * as schema from "@/db/schema";
 import { username } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
-import db from "./lib/db";
 import { nanoid } from "nanoid";
+import { prisma } from "./lib/prisma";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 
 export const auth = betterAuth({
   emailAndPassword: {
@@ -31,6 +30,10 @@ export const auth = betterAuth({
         type: "string",
         required: false,
       },
+      accountPrivacy: {
+        type: "string",
+        required: true,
+      },
     },
   },
   session: {
@@ -41,8 +44,8 @@ export const auth = betterAuth({
       maxAge: 60 * 60 * 24,
     },
   },
-  database: drizzleAdapter(db, {
-    provider: "pg",
+  database: prismaAdapter(prisma, {
+    provider: "postgresql",
   }),
   plugins: [username(), nextCookies()],
 });

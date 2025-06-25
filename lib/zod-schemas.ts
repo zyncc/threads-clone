@@ -38,3 +38,14 @@ export const signInFormSchema = z.object({
     }, "Please enter a valid email or username"),
   password: z.string().min(1, "Password is required"),
 });
+
+export const commentSchema = z.object({
+  comment: z
+    .string()
+    .min(1, {
+      message: "Comment must be at least 1 character.",
+    })
+    .max(255, "Comment must be less than 255 characters")
+    .trim(),
+  id: z.string(),
+});

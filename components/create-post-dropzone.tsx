@@ -112,9 +112,11 @@ export default function CreatePostDropzone() {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Plus className="shrink-0" />
+        <Button variant={"ghost"} className="cursor-pointer" size={"icon"}>
+          <Plus className="size-7" />
+        </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent className="overflow-hidden">
         <AlertDialogHeader>
           <AlertDialogTitle>Create Post</AlertDialogTitle>
         </AlertDialogHeader>
@@ -168,7 +170,7 @@ export default function CreatePostDropzone() {
                 Drop your images here
               </p>
               <p className="text-muted-foreground text-xs">
-                SVG, PNG, JPG or GIF (max. {maxSizeMB}MB)
+                PNG, JPG, JPEG (max. {maxSizeMB}MB)
               </p>
               <Button
                 variant="outline"

@@ -84,7 +84,11 @@ export default function SignInForm() {
             <FormItem>
               <FormLabel>Username or Email</FormLabel>
               <FormControl>
-                <Input placeholder="Enter username or email" {...field} />
+                <Input
+                  autoComplete="off"
+                  placeholder="Enter username or email"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

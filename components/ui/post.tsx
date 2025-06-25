@@ -1,6 +1,32 @@
 "use client";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -13,7 +39,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Bookmark, Heart, MessageCircle } from "lucide-react";
+import { Bookmark, Flag, Heart, MessageCircle, Send } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -37,37 +63,38 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
-import {
-  type followers,
-  type comments,
-  type likes,
-  type post,
-  type user,
-  type savedPosts,
-} from "@/db/schema";
-import { type InferSelectModel } from "drizzle-orm";
 import { toast } from "sonner";
+import { commentSchema } from "@/lib/zod-schemas";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { type z } from "zod";
+import timeAgo from "@/lib/utils";
+import { type User, type Comment } from "@prisma/client";
+import { type Post as PostType } from "@prisma/client";
+import { type CommentWithUser } from "@/lib/types";
 
 type Props = {
-  user: InferSelectModel<typeof user>;
-  post: InferSelectModel<typeof post>;
-  likes: InferSelectModel<typeof likes>[];
-  comments: InferSelectModel<typeof comments>[];
-  following: InferSelectModel<typeof followers>[];
-  savedPost?: InferSelectModel<typeof savedPosts>[];
+  user: User;
+  post: PostType;
+  comments: CommentWithUser[];
+  following: boolean;
+  savedPost: {
+    saved: boolean;
+    id: string;
+  };
   ownPost?: boolean;
 };
 
 export default function Post({
   post,
   user,
-  likes,
   comments,
   following,
   ownPost,
   savedPost,
 }: Props) {
   const [loading, setLoading] = useState(false);
+  const [commentLoading, setCommentLoading] = useState(false);
+  const isMobile = useIsMobile();
   async function handleDelete() {
     setLoading(true);
     await fetch(`/api/post/${post.id}`, {
@@ -75,28 +102,54 @@ export default function Post({
     });
     setLoading(false);
   }
-  const isFollowingPostAuthor = following.find(
-    (f) => f.followingId === post.userId,
-  );
-  const isSavedPost = savedPost?.find((s) => s.postId === post.id);
 
-  async function handleFollowButton() {}
-  async function handleBookmark() {
-    await fetch("/api/bookmark", {
+  async function handleFollowButton() {
+    await fetch(`/api/user/follow/${post.userId}`, {
       method: "POST",
-      body: JSON.stringify({
-        postId: post.id,
-      }),
+    });
+  }
+
+  async function handleUnfollowButton() {
+    await fetch(`/api/user/follow/${post.userId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async function handleBookmark() {
+    if (savedPost.saved) {
+      await fetch(`/api/post/bookmark/${savedPost.id}`, {
+        method: "DELETE",
+      });
+      toast.error("Post unbookmarked successfully");
+      return;
+    }
+    await fetch(`/api/post/bookmark/${post.id}`, {
+      method: "POST",
     });
     toast.success("Post bookmarked successfully");
   }
+
   async function handleLike() {
-    await fetch("/api/like", {
+    await fetch(`/api/post/like/${post.id}`, {
       method: "POST",
-      body: JSON.stringify({
-        postId: post.id,
-      }),
     });
+  }
+
+  const form = useForm<z.infer<typeof commentSchema>>({
+    resolver: zodResolver(commentSchema),
+    defaultValues: {
+      comment: "",
+    },
+  });
+
+  async function commentSubmit({ comment, id }: z.infer<typeof commentSchema>) {
+    setCommentLoading(true);
+    await fetch(`/api/post/comment/${id}`, {
+      method: "POST",
+      body: JSON.stringify({ comment: comment }),
+    });
+    setCommentLoading(false);
+    form.reset();
   }
   return (
     <Card key={post.id} className="mx-auto h-fit w-full max-w-3xl">
@@ -126,18 +179,26 @@ export default function Post({
               </HoverCardContent>
             </HoverCard>
             <p className="text-muted-foreground mt-1 text-xs">
-              {post.createdAt.toDateString()}
+              {timeAgo(post.createdAt)}
             </p>
           </div>
         </div>
         <div className="flex gap-x-5">
-          {!ownPost && !isFollowingPostAuthor && (
+          {!ownPost && !following ? (
             <Button
               onClick={handleFollowButton}
               variant={"outline"}
               size={"sm"}
             >
               Follow
+            </Button>
+          ) : (
+            <Button
+              onClick={handleUnfollowButton}
+              variant={"outline"}
+              size={"sm"}
+            >
+              Unfollow
             </Button>
           )}
           <DropdownMenu>
@@ -267,21 +328,159 @@ export default function Post({
               variant="ghost"
               onClick={handleLike}
               size="sm"
-              className={`h-8 px-2 ${likes.length > 0 ? "text-red-500" : "text-muted-foreground"}`}
+              className={`h-8 px-2 ${post.likeCount > 0 ? "text-red-500" : "text-muted-foreground"}`}
             >
               <Heart
-                className={`mr-1 h-4 w-4 ${likes.length > 0 ? "fill-current" : ""}`}
+                className={`mr-1 h-4 w-4 ${post.likeCount > 0 ? "fill-current" : ""}`}
               />
-              <span className="text-xs">{likes.length}</span>
+              <span className="text-xs">{post.likeCount}</span>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground h-8 px-2"
-            >
-              <MessageCircle className="mr-1 h-4 w-4" />
-              <span className="text-xs">{comments.length}</span>
-            </Button>
+            {isMobile ? (
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground h-8 px-2"
+                  >
+                    <MessageCircle className="mr-1 h-4 w-4" />
+                    <span className="text-xs">{comments.length}</span>
+                  </Button>
+                </DrawerTrigger>
+                <DrawerContent className="h-[calc(100vh-5rem)]">
+                  <DrawerHeader>
+                    <DrawerTitle>Comments</DrawerTitle>
+                  </DrawerHeader>
+                  <div className="flex flex-col gap-y-2 overflow-y-auto py-3">
+                    {comments.map((comment) => (
+                      <Comment
+                        ownPost={ownPost!}
+                        key={comment.id}
+                        comment={comment}
+                      />
+                    ))}
+                  </div>
+                  <DrawerFooter>
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit(commentSubmit)}
+                        className="flex items-end justify-between gap-x-2"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="comment"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <FormMessage />
+                              <FormControl>
+                                <Input
+                                  placeholder="Add a comment"
+                                  className="ring-0 focus:ring-0 focus-visible:ring-0"
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="id"
+                          render={() => (
+                            <input
+                              type="hidden"
+                              value={post.id}
+                              readOnly
+                              {...form.register("id")}
+                            />
+                          )}
+                        />
+                        <Button
+                          disabled={commentLoading}
+                          size={"icon"}
+                          variant={"ghost"}
+                          type="submit"
+                        >
+                          <Send />
+                        </Button>
+                      </form>
+                    </Form>
+                  </DrawerFooter>
+                </DrawerContent>
+              </Drawer>
+            ) : (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground h-8 px-2"
+                  >
+                    <MessageCircle className="mr-1 h-4 w-4" />
+                    <span className="text-xs">{comments.length}</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="min-w-md gap-y-1">
+                  <SheetHeader>
+                    <SheetTitle>Comments</SheetTitle>
+                  </SheetHeader>
+                  <div className="scrollbar-thin flex flex-col gap-y-2 overflow-y-auto py-3">
+                    {comments.map((comment) => (
+                      <Comment
+                        ownPost={ownPost!}
+                        key={comment.id}
+                        comment={comment}
+                      />
+                    ))}
+                  </div>
+                  <SheetFooter className="py-2">
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit(commentSubmit)}
+                        className="flex items-end justify-between gap-x-2"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="comment"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <FormMessage />
+                              <FormControl>
+                                <Input
+                                  placeholder="Add a comment"
+                                  autoFocus={false}
+                                  className="ring-0 focus:ring-0 focus-visible:ring-0"
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="id"
+                          render={() => (
+                            <input
+                              type="hidden"
+                              value={post.id}
+                              readOnly
+                              {...form.register("id")}
+                            />
+                          )}
+                        />
+                        <Button
+                          disabled={commentLoading}
+                          size={"icon"}
+                          variant={"ghost"}
+                          type="submit"
+                        >
+                          <Send />
+                        </Button>
+                      </form>
+                    </Form>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
+            )}
           </div>
           <div>
             <Button
@@ -292,9 +491,86 @@ export default function Post({
             >
               <Bookmark
                 className="h-4 w-4"
-                fill={isSavedPost ? "#e1dfee" : "transparent"}
+                fill={savedPost.saved ? "#e1dfee" : "transparent"}
               />
             </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Comment({
+  comment,
+  ownPost,
+}: {
+  comment: CommentWithUser;
+  ownPost: boolean;
+}) {
+  return (
+    <Card className="mx-2 border-0 py-0 shadow-none">
+      <CardContent className="p-4">
+        <div className="flex justify-between gap-3">
+          <Link
+            href={`/@${comment.user?.username}`}
+            className="text-foreground text-sm font-medium"
+          >
+            <Avatar className="h-8 w-8 flex-shrink-0">
+              <AvatarImage
+                src={comment.user?.image ?? undefined}
+                alt={comment.user?.username}
+              />
+              <AvatarFallback className="text-xs">
+                {comment.user?.name?.[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/@${comment.user?.username}`}
+                  className="text-foreground text-sm font-medium"
+                >
+                  @{comment.user?.username}
+                </Link>
+                <span className="text-muted-foreground text-xs">
+                  {timeAgo(comment.createdAt)}
+                </span>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="hover:bg-muted h-8 w-8 p-0"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {ownPost && (
+                    <>
+                      <DropdownMenuItem className="text-destructive focus:text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete comment
+                      </DropdownMenuItem>
+                      {/* <DropdownMenuSeparator /> */}
+                    </>
+                  )}
+                  <DropdownMenuItem>
+                    <Flag className="mr-2 h-4 w-4" />
+                    Report comment
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <p className="text-foreground mb-2 text-sm leading-relaxed">
+              {comment.content}
+            </p>
           </div>
         </div>
       </CardContent>
