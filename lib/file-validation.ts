@@ -1,5 +1,5 @@
 const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-const maxSizeMB = 2;
+const maxSizeMB = 5;
 
 export default function validateFiles(files: File[]) {
   for (const file of files) {

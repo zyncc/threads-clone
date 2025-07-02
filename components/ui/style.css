@@ -1,0 +1,36 @@
+/* Basic editor styles */
+.tiptap {
+  border: 1px solid;
+  border-color: var(--input);
+  border-radius: calc(var(--radius) /* 0.25rem = 4px */ - 2px);
+  padding-inline: calc(var(--spacing) * 3);
+  padding-block: calc(var(--spacing) * 1);
+  max-height: 200px;
+  overflow-y: auto;
+  :first-child {
+    margin-top: 0;
+  }
+
+  /* Code and preformatted text styles */
+  code {
+    background-color: var(--purple-light);
+    border-radius: 0.4rem;
+    color: var(--black);
+    padding: 0.25em 0.3em;
+  }
+
+  pre {
+    background: #191919;
+    border-radius: 0.5rem;
+    color: var(--white);
+    font-family: "JetBrainsMono", monospace;
+    margin: 1.5rem 0;
+    padding: 0.75rem 1rem;
+
+    code {
+      background: inherit;
+      color: white;
+      padding: 0;
+    }
+  }
+}

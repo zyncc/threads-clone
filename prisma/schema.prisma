@@ -81,17 +81,18 @@ model Verification {
 }
 
 model Post {
-  id          String      @id
-  images      String[]
-  description String
-  likeCount   Int         @default(0)
-  userId      String
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  comments    Comment[]
-  likes       Like[]
-  savedBy     SavedPost[]
+  id           String      @id
+  images       String[]
+  description  String
+  likeCount    Int         @default(0)
+  commentCount Int         @default(0)
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  comments     Comment[]
+  likes        Like[]
+  savedBy      SavedPost[]
 
   @@map("post")
 }
@@ -99,7 +100,6 @@ model Post {
 model Comment {
   id        String   @id
   content   String
-  likes     Int      @default(0)
   postId    String?
   post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
   userId    String?
@@ -117,6 +117,7 @@ model Like {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
+  @@unique([userId, postId])
   @@map("likes")
 }
 
@@ -128,11 +129,12 @@ model SavedPost {
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
+  @@unique([userId, postId])
   @@map("saved_posts")
 }
 
 model Follow {
-  id String @id @default(uuid())
+  id String @id
 
   followerId  String
   followingId String

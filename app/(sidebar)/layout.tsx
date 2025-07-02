@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import AppCollapsedSidebar from "@/components/ui/app-collapsed-sidebar";
+import { ReactQueryProvider } from "@/providers/react-query-provider";
 
 export const metadata: Metadata = {
   title: "Threads Clone",
@@ -13,9 +13,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <SidebarProvider>
+    <ReactQueryProvider>
       <AppCollapsedSidebar />
       {children}
-    </SidebarProvider>
+    </ReactQueryProvider>
   );
 }

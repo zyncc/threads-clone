@@ -28,15 +28,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
-import { useSidebar } from "./sidebar";
 import { authClient } from "@/lib/auth-client";
 import CreatePostDropzone from "../create-post-dropzone";
 import { SiThreads } from "react-icons/si";
+import { useQueryClient } from "@tanstack/react-query";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function AppCollapsedSidebar() {
-  const { isMobile } = useSidebar();
+  const isMobile = useIsMobile();
   const router = useRouter();
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const { data: session, isPending } = authClient.useSession();
   return (
     <>
@@ -68,7 +70,7 @@ export default function AppCollapsedSidebar() {
         </Link>
       </div>
       {/* DESKTOP ONLY SIDEBAR */}
-      <div className="bg-background sticky top-0 bottom-0 left-0 z-50 hidden h-screen w-16 flex-col items-center justify-center min-md:flex">
+      <div className="bg-background fixed top-0 bottom-0 left-0 z-50 hidden h-screen w-16 flex-col items-center justify-center min-md:flex">
         <Link href={"/"}>
           <SiThreads size={30} className="mt-5 cursor-pointer" />
         </Link>
@@ -177,6 +179,8 @@ export default function AppCollapsedSidebar() {
                     fetchOptions: {
                       onSuccess: () => {
                         router.push("/signin");
+
+                        queryClient.clear();
                       },
                     },
                   });

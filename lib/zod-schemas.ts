@@ -47,5 +47,4 @@ export const commentSchema = z.object({
     })
     .max(255, "Comment must be less than 255 characters")
     .trim(),
-  id: z.string(),
 });

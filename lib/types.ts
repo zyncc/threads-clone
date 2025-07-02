@@ -12,3 +12,23 @@ export type CommentWithUser = Prisma.CommentGetPayload<{
     };
   };
 }>;
+
+export type Feed = Prisma.PostGetPayload<{
+  include: {
+    likes: {
+      select: {
+        userId: true;
+      };
+    };
+    savedBy: {
+      select: {
+        userId: true;
+      };
+    };
+    user: {
+      include: {
+        followers: true;
+      };
+    };
+  };
+}>;

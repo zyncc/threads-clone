@@ -1,7 +1,8 @@
-import Post from "@/components/ui/post";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/get-server-session";
 import { redirect } from "next/navigation";
+import Feed from "./_feed";
+import { InfinitePostFeedSize } from "@/lib/constants";
 
 export default async function Home() {
   const session = await getServerSession();
@@ -18,12 +19,19 @@ export default async function Home() {
         accountPrivacy: "public",
       },
     },
-    take: 20,
+    take: InfinitePostFeedSize + 1,
     include: {
+      likes: {
+        where: {
+          userId: session?.user.id,
+        },
+        select: {
+          userId: true,
+        },
+      },
       savedBy: {
         select: {
           userId: true,
-          id: true,
         },
         where: {
           userId: session?.user.id,
@@ -38,19 +46,6 @@ export default async function Home() {
           },
         },
       },
-      comments: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-              username: true,
-            },
-          },
-        },
-        take: 20,
-      },
     },
     orderBy: {
       createdAt: "desc",
@@ -59,22 +54,7 @@ export default async function Home() {
 
   return (
     <div className="container mx-auto p-2">
-      <div className="my-10 flex flex-col gap-5">
-        {feed.map((post) => (
-          <Post
-            key={post.id}
-            user={post.user}
-            post={post}
-            comments={post.comments}
-            savedPost={{
-              saved: post.savedBy[0]?.userId === session?.user.id,
-              id: post.savedBy[0]?.id,
-            }}
-            following={post.user.followers[0]?.followerId === session?.user.id}
-            ownPost={post.userId === session?.user.id}
-          />
-        ))}
-      </div>
+      <Feed feed={feed} session={session} />
     </div>
   );
 }

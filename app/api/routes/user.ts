@@ -13,6 +13,7 @@ export const user = new Hono<{
   };
 }>();
 
+// Update User Avatar
 user.post("/avatar", async (c) => {
   type Area = { x: number; y: number; width: number; height: number };
   const formData = await c.req.formData();
@@ -50,6 +51,82 @@ user.post("/avatar", async (c) => {
   );
 });
 
+// Check if User has liked Post
+user.get("/liked/:id", async (c) => {
+  const user = c.get("user");
+  const postId = c.req.param("id");
+
+  const likedPost = await prisma.user.findUnique({
+    where: { id: user?.id as string },
+    include: {
+      Like: {
+        select: {
+          postId: true,
+        },
+        where: {
+          postId: postId,
+        },
+      },
+    },
+  });
+
+  const likeCount = likedPost?.Like.length;
+
+  return c.json({ likedPost: !!likedPost?.Like.length, likeCount });
+});
+
+// Check if User is Following
+user.get("/following/:id", async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+
+  const following = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+    select: {
+      followers: {
+        select: {
+          followerId: true,
+        },
+        where: {
+          followerId: user?.id as string,
+        },
+      },
+    },
+  });
+
+  return c.json({
+    following: !!following?.followers.length,
+  });
+});
+
+user.get("/savedpost/:id", async (c) => {
+  const user = c.get("user");
+  const postId = c.req.param("id");
+
+  const savedPost = await prisma.user.findUnique({
+    where: {
+      id: user?.id as string,
+    },
+    include: {
+      savedPost: {
+        select: {
+          postId: true,
+        },
+        where: {
+          postId: postId,
+        },
+      },
+    },
+  });
+
+  return c.json({
+    savedPost: !!savedPost?.savedPost.length,
+  });
+});
+
+// Follow User
 user.post("/follow/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
@@ -72,6 +149,7 @@ user.post("/follow/:id", async (c) => {
   });
 });
 
+// Unfollow User
 user.delete("/follow/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");

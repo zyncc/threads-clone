@@ -15,6 +15,11 @@ import {
   ErrorResponse,
   SuccessResponse,
 } from "@/lib/api-responses";
+import { commentSchema } from "@/lib/zod-schemas";
+import {
+  InfinitePostCommentsSize,
+  InfinitePostFeedSize,
+} from "@/lib/constants";
 
 export const posts = new Hono<{
   Variables: {
@@ -23,6 +28,7 @@ export const posts = new Hono<{
   };
 }>();
 
+// Create Post
 posts.post("/", async (c) => {
   try {
     const data = await c.req.formData();
@@ -39,6 +45,7 @@ posts.post("/", async (c) => {
       const check = validateFiles(images);
 
       if (!check?.success) {
+        console.error("Invalid file type");
         return c.json(
           ErrorResponse({
             message: "Invalid file type",
@@ -63,15 +70,35 @@ posts.post("/", async (c) => {
         const uniqueName = `${user?.id}_${nanoid(12)}`;
         const fileNameWithExtension = `${uniqueName}.${extension}`;
         const arrayBuffer = await image.arrayBuffer();
-        const targetWidth = 1200;
-        const targetHeight = Math.round((3 / 4) * targetWidth);
+
+        //Sharp Image Processing
+        const metadata = await sharp(arrayBuffer).metadata();
+        const maxWidth = 1080;
+        const maxHeight = 1350;
+
+        let width = metadata.width!;
+        let height = metadata.height!;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((maxWidth / width) * height);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((maxHeight / height) * width);
+            height = maxHeight;
+          }
+        }
+
         const compressedImage = await sharp(arrayBuffer)
-          .resize(targetWidth, targetHeight, {
-            fit: "cover",
-            position: "center",
+          .resize(width, height, {
+            fit: "inside",
+            withoutEnlargement: true,
           })
           .jpeg({
             quality: 80,
+            progressive: true,
             mozjpeg: true,
           })
           .toBuffer();
@@ -121,7 +148,8 @@ posts.post("/", async (c) => {
   }
 });
 
-posts.post("/:id", async (c) => {
+// Delete Post
+posts.delete("/:id", async (c) => {
   try {
     const id = c.req.param("id");
     const user = c.get("user");
@@ -191,6 +219,7 @@ posts.post("/:id", async (c) => {
   }
 });
 
+// Bookmark Post
 posts.post("/bookmark/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
@@ -209,11 +238,15 @@ posts.post("/bookmark/:id", async (c) => {
   });
 });
 
+// Unbookmark Post
 posts.delete("/bookmark/:id", async (c) => {
   const id = c.req.param("id");
   await prisma.savedPost.delete({
     where: {
-      id,
+      userId_postId: {
+        userId: c.get("user")?.id as string,
+        postId: id,
+      },
     },
   });
 
@@ -223,45 +256,460 @@ posts.delete("/bookmark/:id", async (c) => {
   });
 });
 
+// Create Comment
 posts.post("/comment/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
+  console.log(id);
   const { comment }: { comment: string } = await c.req.json();
+
+  const validate = commentSchema.safeParse({ comment, id });
+
+  if (!validate.success) {
+    return c.json(
+      ErrorResponse({
+        message: "Invalid comment",
+        error: {
+          code: 400,
+          type: "Invalid comment",
+        },
+      }),
+      400,
+    );
+  }
 
   await prisma.comment.create({
     data: {
       id: nanoid(12),
       content: comment,
-      userId: user?.id,
+      userId: user?.id as string,
       postId: id,
     },
   });
+
+  await prisma.post.update({
+    data: {
+      commentCount: {
+        increment: 1,
+      },
+    },
+    where: {
+      id,
+    },
+  });
+
   return c.json({
     status: 201,
     message: "Comment added successfully",
   });
 });
 
+// Delete Comment
+posts.delete("/comment/:id", async (c) => {
+  const user = c.get("user");
+  const postId = c.req.param("id");
+  const commentId = c.req.query("commentId");
+
+  // Authentication
+  if (!user) {
+    return c.json(AuthErrorResponse(), 401);
+  }
+
+  // Authorization
+  const comment = await prisma.comment.findUnique({
+    where: {
+      id: commentId as string,
+    },
+  });
+
+  if (!comment || comment.userId !== user?.id) {
+    return c.json(
+      ErrorResponse({
+        message: "Comment not found or not authorized",
+        error: {
+          code: 403,
+          type: "Comment not found or not authorized",
+        },
+      }),
+      403,
+    );
+  }
+
+  await prisma.comment.delete({
+    where: {
+      id: commentId as string,
+    },
+  });
+
+  await prisma.post.update({
+    data: {
+      commentCount: {
+        decrement: 1,
+      },
+    },
+    where: {
+      id: postId,
+    },
+  });
+
+  return c.json({
+    status: 201,
+    message: "Comment added successfully",
+  });
+});
+
+// Fetch Infinite Post Comments
+posts.get("/comments/:id", async (c) => {
+  const id = c.req.param("id");
+  const cursor = c.req.query("cursor") || undefined;
+
+  const comments = await prisma.comment.findMany({
+    where: {
+      postId: id,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          username: true,
+        },
+      },
+    },
+    take: InfinitePostCommentsSize + 1,
+    cursor: cursor ? { id: cursor } : undefined,
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  const nextCursor =
+    comments.length > InfinitePostCommentsSize
+      ? comments[InfinitePostCommentsSize].id
+      : null;
+
+  return c.json({
+    comments: comments.slice(0, InfinitePostCommentsSize),
+    nextCursor,
+  });
+});
+
+// Infinite Following Feed
+posts.get("/following-feed", async (c) => {
+  const cursor = c.req.query("cursor") || undefined;
+  const user = c.get("user");
+
+  const feed = await prisma.post.findMany({
+    where: {
+      user: {
+        followers: {
+          some: {
+            followerId: user?.id,
+          },
+        },
+      },
+    },
+    cursor: cursor ? { id: cursor } : undefined,
+    take: InfinitePostFeedSize + 1,
+    include: {
+      likes: {
+        where: {
+          userId: user?.id,
+        },
+        select: {
+          userId: true,
+        },
+      },
+      savedBy: {
+        select: {
+          userId: true,
+        },
+        where: {
+          userId: user?.id,
+        },
+      },
+      user: {
+        include: {
+          followers: {
+            where: {
+              followerId: user?.id,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  const nextCursor =
+    feed.length > InfinitePostFeedSize ? feed[InfinitePostFeedSize].id : null;
+
+  return c.json({ feed: feed.slice(0, InfinitePostFeedSize), nextCursor });
+});
+
+// Infinite Account Feed
+posts.get("/account-feed", async (c) => {
+  const cursor = c.req.query("cursor") || undefined;
+  const user = c.get("user");
+
+  const feed = await prisma.post.findMany({
+    where: {
+      user: {
+        accountPrivacy: "public",
+        username: user?.username as string,
+      },
+    },
+    cursor: cursor ? { id: cursor } : undefined,
+    take: InfinitePostFeedSize + 1,
+    skip: 1,
+    include: {
+      likes: {
+        where: {
+          userId: user?.id,
+        },
+        select: {
+          userId: true,
+        },
+      },
+      savedBy: {
+        select: {
+          userId: true,
+        },
+        where: {
+          userId: user?.id,
+        },
+      },
+      user: {
+        include: {
+          followers: {
+            where: {
+              followerId: user?.id,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  const nextCursor =
+    feed.length > InfinitePostFeedSize ? feed[InfinitePostFeedSize].id : null;
+
+  return c.json({ feed: feed.slice(0, InfinitePostFeedSize), nextCursor });
+});
+
+// Infinite Account Saved Feed
+posts.get("/saved-feed", async (c) => {
+  const cursor = c.req.query("cursor") || undefined;
+  const user = c.get("user");
+
+  const feed = await prisma.post.findMany({
+    where: {
+      savedBy: {
+        some: {
+          userId: user?.id,
+        },
+      },
+    },
+    cursor: cursor ? { id: cursor } : undefined,
+    take: InfinitePostFeedSize + 1,
+    include: {
+      likes: {
+        where: {
+          userId: user?.id,
+        },
+        select: {
+          userId: true,
+        },
+      },
+      savedBy: {
+        select: {
+          userId: true,
+        },
+        where: {
+          userId: user?.id,
+        },
+      },
+      user: {
+        include: {
+          followers: {
+            where: {
+              followerId: user?.id,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  const nextCursor =
+    feed.length > InfinitePostFeedSize ? feed[InfinitePostFeedSize].id : null;
+
+  return c.json({ feed: feed.slice(0, InfinitePostFeedSize), nextCursor });
+});
+
+// Infinite For You Feed
+posts.get("/for-you-feed", async (c) => {
+  const cursor = c.req.query("cursor") || undefined;
+  const user = c.get("user");
+
+  const feed = await prisma.post.findMany({
+    where: {
+      userId: {
+        not: user?.id,
+      },
+      user: {
+        accountPrivacy: "public",
+      },
+    },
+    cursor: cursor ? { id: cursor } : undefined,
+    take: InfinitePostFeedSize + 1,
+    skip: 1,
+    include: {
+      likes: {
+        where: {
+          userId: user?.id,
+        },
+        select: {
+          userId: true,
+        },
+      },
+      savedBy: {
+        select: {
+          userId: true,
+        },
+        where: {
+          userId: user?.id,
+        },
+      },
+      user: {
+        include: {
+          followers: {
+            where: {
+              followerId: user?.id,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  const nextCursor =
+    feed.length > InfinitePostFeedSize ? feed[InfinitePostFeedSize].id : null;
+
+  return c.json({ feed: feed.slice(0, InfinitePostFeedSize), nextCursor });
+});
+
+// Like Post
 posts.post("/like/:id", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
 
-  await prisma.post.update({
-    where: {
-      id,
-    },
-    data: {
-      likeCount: {
-        increment: 1,
+  const [post, like] = await Promise.allSettled([
+    prisma.post.update({
+      where: {
+        id,
       },
-    },
-  });
+      data: {
+        likeCount: {
+          increment: 1,
+        },
+      },
+    }),
+    prisma.like.create({
+      data: {
+        id: nanoid(12),
+        userId: user?.id as string,
+        postId: id,
+      },
+    }),
+  ]);
 
-  await prisma.like.create({
-    data: {
-      id: nanoid(12),
-      userId: user?.id as string,
-      postId: id,
-    },
-  });
+  if (post.status === "fulfilled" && like.status === "fulfilled") {
+    return c.json({
+      status: 201,
+      message: "Post liked successfully",
+    });
+  }
+});
+
+// Dislike Post
+posts.delete("/like/:id", async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+
+  const [post, like] = await Promise.allSettled([
+    prisma.post.update({
+      where: {
+        id,
+      },
+      data: {
+        likeCount: {
+          decrement: 1,
+        },
+      },
+    }),
+    prisma.like.delete({
+      where: {
+        userId_postId: {
+          postId: id,
+          userId: user?.id as string,
+        },
+      },
+    }),
+  ]);
+
+  if (post.status === "fulfilled" && like.status === "fulfilled") {
+    return c.json({
+      status: 201,
+      message: "Post disliked successfully",
+    });
+  }
+});
+
+// Unlike Post
+posts.delete("/like/:id", async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+
+  const [post, like] = await Promise.allSettled([
+    prisma.post.update({
+      where: {
+        id,
+      },
+      data: {
+        likeCount: {
+          decrement: 1,
+        },
+      },
+    }),
+    prisma.like.delete({
+      where: {
+        userId_postId: {
+          userId: user?.id as string,
+          postId: id,
+        },
+      },
+    }),
+  ]);
+
+  if (post.status === "fulfilled" && like.status === "fulfilled") {
+    revalidatePath(`/@${user?.username}`, "page");
+    revalidatePath("/", "page");
+    return c.json({
+      status: 201,
+      message: "Post liked successfully",
+    });
+  }
 });

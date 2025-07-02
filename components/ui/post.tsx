@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useInView } from "react-intersection-observer";
 import {
   Drawer,
   DrawerContent,
@@ -39,7 +40,14 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Bookmark, Flag, Heart, MessageCircle, Send } from "lucide-react";
+import {
+  Bookmark,
+  Flag,
+  Heart,
+  Loader2,
+  MessageCircle,
+  Send,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -68,89 +76,56 @@ import { commentSchema } from "@/lib/zod-schemas";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { type z } from "zod";
 import timeAgo from "@/lib/utils";
-import { type User, type Comment } from "@prisma/client";
+import { type User } from "@prisma/client";
 import { type Post as PostType } from "@prisma/client";
 import { type CommentWithUser } from "@/lib/types";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { type Session } from "@/auth";
+import useFollowButton from "@/hooks/useFollowButton";
+import parse from "html-react-parser";
 
 type Props = {
   user: User;
   post: PostType;
-  comments: CommentWithUser[];
-  following: boolean;
-  savedPost: {
-    saved: boolean;
-    id: string;
-  };
-  ownPost?: boolean;
+  session: Session | null;
+  isFollowedByUser: boolean;
+  hasLiked: boolean;
+  savedPost: boolean;
+  ownPost: boolean;
 };
 
 export default function Post({
   post,
   user,
-  comments,
-  following,
+  session,
+  isFollowedByUser,
+  hasLiked,
   ownPost,
   savedPost,
 }: Props) {
   const [loading, setLoading] = useState(false);
-  const [commentLoading, setCommentLoading] = useState(false);
-  const isMobile = useIsMobile();
-  async function handleDelete() {
+  // const queryClient = useQueryClient();
+  async function handleDeletePost() {
     setLoading(true);
     await fetch(`/api/post/${post.id}`, {
-      method: "POST",
-    });
-    setLoading(false);
-  }
-
-  async function handleFollowButton() {
-    await fetch(`/api/user/follow/${post.userId}`, {
-      method: "POST",
-    });
-  }
-
-  async function handleUnfollowButton() {
-    await fetch(`/api/user/follow/${post.userId}`, {
       method: "DELETE",
     });
+    setLoading(false);
+    // queryClient.invalidateQueries({
+    //   queryKey: ["account-feed", session?.user.id],
+    // });
   }
 
-  async function handleBookmark() {
-    if (savedPost.saved) {
-      await fetch(`/api/post/bookmark/${savedPost.id}`, {
-        method: "DELETE",
-      });
-      toast.error("Post unbookmarked successfully");
-      return;
-    }
-    await fetch(`/api/post/bookmark/${post.id}`, {
-      method: "POST",
-    });
-    toast.success("Post bookmarked successfully");
-  }
+  const { mutate: mutateFollowAction, data: followData } = useFollowButton(
+    post.userId,
+    isFollowedByUser,
+  );
 
-  async function handleLike() {
-    await fetch(`/api/post/like/${post.id}`, {
-      method: "POST",
-    });
-  }
-
-  const form = useForm<z.infer<typeof commentSchema>>({
-    resolver: zodResolver(commentSchema),
-    defaultValues: {
-      comment: "",
-    },
-  });
-
-  async function commentSubmit({ comment, id }: z.infer<typeof commentSchema>) {
-    setCommentLoading(true);
-    await fetch(`/api/post/comment/${id}`, {
-      method: "POST",
-      body: JSON.stringify({ comment: comment }),
-    });
-    setCommentLoading(false);
-    form.reset();
-  }
   return (
     <Card key={post.id} className="mx-auto h-fit w-full max-w-3xl">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -184,22 +159,11 @@ export default function Post({
           </div>
         </div>
         <div className="flex gap-x-5">
-          {!ownPost && !following ? (
-            <Button
-              onClick={handleFollowButton}
-              variant={"outline"}
-              size={"sm"}
-            >
-              Follow
-            </Button>
-          ) : (
-            <Button
-              onClick={handleUnfollowButton}
-              variant={"outline"}
-              size={"sm"}
-            >
-              Unfollow
-            </Button>
+          {!ownPost && (
+            <FollowButton
+              userId={post.userId}
+              initialFollowing={isFollowedByUser}
+            />
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -209,6 +173,11 @@ export default function Post({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              {followData.following ? (
+                <DropdownMenuItem onSelect={() => mutateFollowAction()}>
+                  Unfollow
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem>Share post</DropdownMenuItem>
               {ownPost && (
                 <>
@@ -217,9 +186,9 @@ export default function Post({
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem
                         onSelect={(e) => e.preventDefault()}
-                        className="text-red-600"
+                        variant="destructive"
                       >
-                        <Trash2 className="mr-2 h-4 w-4 text-red-600" /> Delete
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -240,7 +209,7 @@ export default function Post({
                         <AlertDialogAction asChild>
                           <Button
                             disabled={loading}
-                            onClick={handleDelete}
+                            onClick={handleDeletePost}
                             variant={"destructive"}
                             className="m-0"
                           >
@@ -257,7 +226,7 @@ export default function Post({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm leading-relaxed">{post.description}</p>
+        <div className="text-sm leading-relaxed">{parse(post.description)}</div>
         {post.images && post.images.length > 0 && (
           <div className="space-y-2">
             {post.images.length === 1 ? (
@@ -324,190 +293,262 @@ export default function Post({
         )}
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              onClick={handleLike}
-              size="sm"
-              className={`h-8 px-2 ${post.likeCount > 0 ? "text-red-500" : "text-muted-foreground"}`}
-            >
-              <Heart
-                className={`mr-1 h-4 w-4 ${post.likeCount > 0 ? "fill-current" : ""}`}
-              />
-              <span className="text-xs">{post.likeCount}</span>
-            </Button>
-            {isMobile ? (
-              <Drawer>
-                <DrawerTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground h-8 px-2"
-                  >
-                    <MessageCircle className="mr-1 h-4 w-4" />
-                    <span className="text-xs">{comments.length}</span>
-                  </Button>
-                </DrawerTrigger>
-                <DrawerContent className="h-[calc(100vh-5rem)]">
-                  <DrawerHeader>
-                    <DrawerTitle>Comments</DrawerTitle>
-                  </DrawerHeader>
-                  <div className="flex flex-col gap-y-2 overflow-y-auto py-3">
-                    {comments.map((comment) => (
-                      <Comment
-                        ownPost={ownPost!}
-                        key={comment.id}
-                        comment={comment}
-                      />
-                    ))}
-                  </div>
-                  <DrawerFooter>
-                    <Form {...form}>
-                      <form
-                        onSubmit={form.handleSubmit(commentSubmit)}
-                        className="flex items-end justify-between gap-x-2"
-                      >
-                        <FormField
-                          control={form.control}
-                          name="comment"
-                          render={({ field }) => (
-                            <FormItem className="flex-1">
-                              <FormMessage />
-                              <FormControl>
-                                <Input
-                                  placeholder="Add a comment"
-                                  className="ring-0 focus:ring-0 focus-visible:ring-0"
-                                  {...field}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="id"
-                          render={() => (
-                            <input
-                              type="hidden"
-                              value={post.id}
-                              readOnly
-                              {...form.register("id")}
-                            />
-                          )}
-                        />
-                        <Button
-                          disabled={commentLoading}
-                          size={"icon"}
-                          variant={"ghost"}
-                          type="submit"
-                        >
-                          <Send />
-                        </Button>
-                      </form>
-                    </Form>
-                  </DrawerFooter>
-                </DrawerContent>
-              </Drawer>
-            ) : (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground h-8 px-2"
-                  >
-                    <MessageCircle className="mr-1 h-4 w-4" />
-                    <span className="text-xs">{comments.length}</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent className="min-w-md gap-y-1">
-                  <SheetHeader>
-                    <SheetTitle>Comments</SheetTitle>
-                  </SheetHeader>
-                  <div className="scrollbar-thin flex flex-col gap-y-2 overflow-y-auto py-3">
-                    {comments.map((comment) => (
-                      <Comment
-                        ownPost={ownPost!}
-                        key={comment.id}
-                        comment={comment}
-                      />
-                    ))}
-                  </div>
-                  <SheetFooter className="py-2">
-                    <Form {...form}>
-                      <form
-                        onSubmit={form.handleSubmit(commentSubmit)}
-                        className="flex items-end justify-between gap-x-2"
-                      >
-                        <FormField
-                          control={form.control}
-                          name="comment"
-                          render={({ field }) => (
-                            <FormItem className="flex-1">
-                              <FormMessage />
-                              <FormControl>
-                                <Input
-                                  placeholder="Add a comment"
-                                  autoFocus={false}
-                                  className="ring-0 focus:ring-0 focus-visible:ring-0"
-                                  {...field}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="id"
-                          render={() => (
-                            <input
-                              type="hidden"
-                              value={post.id}
-                              readOnly
-                              {...form.register("id")}
-                            />
-                          )}
-                        />
-                        <Button
-                          disabled={commentLoading}
-                          size={"icon"}
-                          variant={"ghost"}
-                          type="submit"
-                        >
-                          <Send />
-                        </Button>
-                      </form>
-                    </Form>
-                  </SheetFooter>
-                </SheetContent>
-              </Sheet>
-            )}
+            <LikeButton
+              postId={post.id}
+              hasLiked={hasLiked}
+              likeCount={post.likeCount}
+            />
+            <Comments post={post} session={session} />
           </div>
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBookmark}
-              className="text-muted-foreground h-8 px-2"
-            >
-              <Bookmark
-                className="h-4 w-4"
-                fill={savedPost.saved ? "#e1dfee" : "transparent"}
-              />
-            </Button>
-          </div>
+          <BookmarkButton
+            postId={post.id}
+            session={session}
+            savedPost={savedPost}
+          />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function Comment({
-  comment,
-  ownPost,
+function Comments({
+  post,
+  session,
 }: {
-  comment: CommentWithUser;
-  ownPost: boolean;
+  post: PostType;
+  session: Session | null;
 }) {
+  const isMobile = useIsMobile();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { ref } = useInView({
+    rootMargin: "200px",
+    onChange: (inView) => {
+      if (inView && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+  });
+
+  const form = useForm<z.infer<typeof commentSchema>>({
+    resolver: zodResolver(commentSchema),
+    defaultValues: {
+      comment: "",
+    },
+  });
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isPending } =
+    useInfiniteQuery({
+      queryKey: ["comments", post.id],
+      queryFn: async ({ pageParam }) => {
+        const comments = await fetch(
+          `/api/post/comments/${post.id}${pageParam ? `?cursor=${pageParam}` : ""}`,
+        );
+        const data: { comments: CommentWithUser[]; nextCursor: string | null } =
+          await comments.json();
+        return data;
+      },
+      initialPageParam: null as string | null,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      enabled: isSheetOpen || isDrawerOpen,
+      staleTime: Infinity,
+      refetchInterval: false,
+      refetchOnWindowFocus: false,
+    });
+
+  const comments = data?.pages.flatMap((page) => page.comments) || [];
+
+  async function commentSubmit({ comment }: z.infer<typeof commentSchema>) {
+    await fetch(`/api/post/comment/${post.id}`, {
+      method: "POST",
+      body: JSON.stringify({ comment: comment }),
+    });
+    form.reset();
+    await queryClient.invalidateQueries({
+      queryKey: ["comments", post.id],
+    });
+  }
+  if (isMobile)
+    return (
+      <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+        <DrawerTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground h-8 px-2"
+          >
+            <MessageCircle className="mr-1 h-4 w-4" />
+            <span className="text-xs">{post.commentCount}</span>
+          </Button>
+        </DrawerTrigger>
+        <DrawerContent className="h-[calc(100vh-5rem)]">
+          <DrawerHeader>
+            <DrawerTitle>Comments</DrawerTitle>
+          </DrawerHeader>
+          <div className="flex flex-col gap-y-2 overflow-y-auto py-3">
+            {isPending && (
+              <div className="flex h-full w-full items-start justify-center">
+                <Loader2 className="mt-10 size-10 animate-spin" />
+              </div>
+            )}
+            {comments.length == 0 && (
+              <p className="text-muted-foreground text-center">
+                No comments yet.
+              </p>
+            )}
+            {!isPending &&
+              comments.map((comment) => (
+                <CommentCard
+                  postId={post.id}
+                  ownComment={comment.userId === session?.user.id}
+                  key={comment.id}
+                  comment={comment}
+                />
+              ))}
+            {hasNextPage && (
+              <div
+                ref={ref}
+                className="flex w-full items-center justify-center"
+              >
+                <Loader2 className="my-4 size-7 animate-spin" />
+              </div>
+            )}
+          </div>
+          <DrawerFooter className="border-t">
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(commentSubmit)}
+                className="flex items-end justify-between gap-x-2"
+              >
+                <FormField
+                  control={form.control}
+                  name="comment"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormMessage />
+                      <FormControl>
+                        <Input
+                          autoComplete="off"
+                          autoFocus={false}
+                          placeholder="Share your thoughts..."
+                          className="ring-0 focus:ring-0 focus-visible:ring-0"
+                          {...field}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <Button size={"icon"} variant={"outline"} type="submit">
+                  <Send />
+                </Button>
+              </form>
+            </Form>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    );
+  return (
+    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground h-8 px-2"
+        >
+          <MessageCircle className="mr-1 h-4 w-4" />
+          <span className="text-xs">{post.commentCount}</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="min-w-md gap-y-1">
+        <SheetHeader>
+          <SheetTitle>Comments</SheetTitle>
+        </SheetHeader>
+        <div className="scrollbar-thin flex flex-col gap-y-2 overflow-y-auto py-3">
+          {isPending && (
+            <div className="flex h-full w-full items-start justify-center">
+              <Loader2 className="mt-10 size-10 animate-spin" />
+            </div>
+          )}
+          {!isPending &&
+            comments.map((comment) => (
+              <CommentCard
+                postId={post.id}
+                ownComment={comment.userId == session?.user.id}
+                key={comment.id}
+                comment={comment}
+              />
+            ))}
+          {hasNextPage && (
+            <div ref={ref} className="flex w-full items-center justify-center">
+              <Loader2 className="my-4 size-7 animate-spin" />
+            </div>
+          )}
+        </div>
+        <SheetFooter className="border-t py-2">
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(commentSubmit)}
+              className="flex items-end justify-between gap-x-2"
+            >
+              <FormField
+                control={form.control}
+                name="comment"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormMessage />
+                    <FormControl>
+                      <Input
+                        placeholder="Share your thoughts..."
+                        autoFocus={false}
+                        autoComplete="off"
+                        className="ring-0 focus:ring-0 focus-visible:ring-0"
+                        {...field}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <Button size={"icon"} variant={"outline"} type="submit">
+                <Send />
+              </Button>
+            </form>
+          </Form>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function CommentCard({
+  postId,
+  comment,
+  ownComment,
+}: {
+  postId: string;
+  comment: CommentWithUser;
+  ownComment: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { mutate } = useMutation({
+    mutationFn: async () => {
+      await fetch(`/api/post/comment/${postId}?commentId=${comment.id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["comments", postId],
+      });
+    },
+    onError: () => {
+      toast.error("Failed to delete comment");
+    },
+  });
+  function handleDeleteComment() {
+    mutate();
+  }
+
   return (
     <Card className="mx-2 border-0 py-0 shadow-none">
       <CardContent className="p-4">
@@ -551,13 +592,18 @@ function Comment({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  {ownPost && (
+                  {ownComment && (
                     <>
-                      <DropdownMenuItem className="text-destructive focus:text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete comment
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => {
+                          handleDeleteComment();
+                        }}
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        Delete
                       </DropdownMenuItem>
-                      {/* <DropdownMenuSeparator /> */}
+                      <DropdownMenuSeparator />
                     </>
                   )}
                   <DropdownMenuItem>
@@ -576,4 +622,163 @@ function Comment({
       </CardContent>
     </Card>
   );
+}
+
+function LikeButton({
+  postId,
+  likeCount,
+  hasLiked,
+}: {
+  postId: string;
+  likeCount: number;
+  hasLiked: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["likes", postId],
+    initialData: { hasLiked, likeCount },
+    queryFn: async () => {
+      const response = await fetch(`/api/user/liked/${postId}`);
+      const data: { hasLiked: boolean; likeCount: number } =
+        await response.json();
+      return data;
+    },
+    staleTime: Infinity,
+  });
+  const { mutate } = useMutation({
+    mutationFn: async () => {
+      await fetch(`/api/post/like/${postId}`, {
+        method: data?.hasLiked ? "DELETE" : "POST",
+      });
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({
+        queryKey: ["likes", postId],
+      });
+      const previousState = queryClient.getQueryData<{
+        hasLiked: boolean;
+        likeCount: number;
+      }>(["likes", postId]);
+
+      const likeCount = previousState?.likeCount ?? 0;
+
+      queryClient.setQueryData<{ hasLiked: boolean; likeCount: number }>(
+        ["likes", postId],
+        {
+          hasLiked: !previousState?.hasLiked,
+          likeCount: likeCount + (previousState?.hasLiked ? -1 : 1),
+        },
+      );
+      return { previousState };
+    },
+    onError(error, _, context) {
+      queryClient.setQueryData<{ hasLiked: boolean; likeCount: number }>(
+        ["likes", postId],
+        context?.previousState,
+      );
+      console.error(error);
+      toast.error("Something went wrong");
+    },
+  });
+  return (
+    <Button
+      variant="ghost"
+      onClick={() => mutate()}
+      size="sm"
+      className={`h-8 px-2 ${data.hasLiked ? "hover:text-red-500" : "hover:text-muted-foreground"} ${data.hasLiked ? "text-red-500" : "text-muted-foreground"}`}
+    >
+      <Heart
+        className={`mr-1 h-4 w-4 ${data.hasLiked ? "fill-current" : ""}`}
+      />
+      <span className="text-xs">{data.likeCount}</span>
+    </Button>
+  );
+}
+
+function BookmarkButton({
+  postId,
+  savedPost,
+  session,
+}: {
+  postId: string;
+  savedPost: boolean;
+  session: Session | null;
+}) {
+  const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ["savedPost", postId],
+    initialData: { savedPost },
+    queryFn: async () => {
+      const response = await fetch(`/api/user/savedpost${postId}`);
+      const data: { savedPost: boolean } = await response.json();
+      return data;
+    },
+    staleTime: Infinity,
+  });
+
+  const { mutate } = useMutation({
+    mutationFn: async () => {
+      await fetch(`/api/post/bookmark/${postId}`, {
+        method: data.savedPost ? "DELETE" : "POST",
+      });
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["savedPost", postId] });
+
+      const previousState = queryClient.getQueryData<{ savedPost: boolean }>([
+        "savedPost",
+        postId,
+      ]);
+
+      queryClient.setQueryData<{ savedPost: boolean }>(["savedPost", postId], {
+        savedPost: !previousState?.savedPost,
+      });
+      return { previousState };
+    },
+    onError(error, _, context) {
+      queryClient.setQueryData<{ savedPost: boolean }>(
+        ["savedPost", postId],
+        context?.previousState,
+      );
+      console.error(error);
+      toast.error("Something went wrong");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["saved-feed", session?.user.id],
+      });
+    },
+  });
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => mutate()}
+      className="text-muted-foreground h-8 px-2"
+    >
+      <Bookmark
+        className="h-4 w-4"
+        fill={data?.savedPost ? "#e1dfee" : "transparent"}
+      />
+    </Button>
+  );
+}
+
+function FollowButton({
+  userId,
+  initialFollowing,
+}: {
+  userId: string;
+  initialFollowing: boolean;
+}) {
+  const { data, mutate } = useFollowButton(userId, initialFollowing);
+
+  if (!data.following)
+    return (
+      <Button variant={"secondary"} onClick={() => mutate()}>
+        Follow
+      </Button>
+    );
 }
