@@ -23,9 +23,11 @@ import { InfinitePostFeedSize } from "@/lib/constants";
 export default function AccountFeed({
   session,
   feed,
+  username,
 }: {
   session: Session;
   feed: Feed[];
+  username: string;
 }) {
   const [tab, setTab] = useState("posts");
   const {
@@ -46,7 +48,7 @@ export default function AccountFeed({
       ],
       pageParams: [0],
     },
-    queryKey: ["account-feed", session.user.id],
+    queryKey: ["account-feed", username],
     queryFn: async ({ pageParam }) => {
       const response = await fetch(
         `/api/post/account-feed?cursor=${pageParam}`,
@@ -67,7 +69,7 @@ export default function AccountFeed({
     hasNextPage: savedHasNextPage,
     isPending,
   } = useInfiniteQuery({
-    queryKey: ["saved-feed", session?.user.id],
+    queryKey: ["saved-feed", username],
     queryFn: async ({ pageParam }) => {
       const response = await fetch(
         `/api/post/saved-feed${pageParam ? `?cursor=${pageParam}` : ""}`,

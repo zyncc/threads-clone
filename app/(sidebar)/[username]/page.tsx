@@ -62,5 +62,5 @@ export default async function AccountPage({
     return notFound();
   }
 
-  return <AccountFeed feed={feed} session={session} />;
+  return <AccountFeed feed={feed} username={username} session={session} />;
 }

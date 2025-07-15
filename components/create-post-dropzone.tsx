@@ -2,9 +2,16 @@
 
 import {
   AlertCircleIcon,
+  FileArchiveIcon,
+  FileIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  HeadphonesIcon,
+  ImageIcon,
   LoaderCircle,
   Plus,
   UploadIcon,
+  VideoIcon,
   XIcon,
 } from "lucide-react";
 
@@ -31,9 +38,8 @@ import { Bold, Italic, Redo, Undo } from "lucide-react";
 import { Controller } from "react-hook-form";
 import { Form } from "./ui/form";
 
-const extensions = [StarterKit];
 export default function CreatePostDropzone() {
-  const maxSizeMB = 5;
+  const maxSizeMB = 10;
   const maxSize = maxSizeMB * 1024 * 1024;
   const maxFiles = 6;
 
@@ -41,6 +47,45 @@ export default function CreatePostDropzone() {
   const [isLoading, setIsLoading] = useState(false);
   const [text, setText] = useState("");
   const [html, setHtml] = useState("");
+
+  const getFileIcon = (file: {
+    file: File | { type: string; name: string };
+  }) => {
+    const fileType =
+      file.file instanceof File ? file.file.type : file.file.type;
+    const fileName =
+      file.file instanceof File ? file.file.name : file.file.name;
+
+    if (
+      fileType.includes("pdf") ||
+      fileName.endsWith(".pdf") ||
+      fileType.includes("word") ||
+      fileName.endsWith(".doc") ||
+      fileName.endsWith(".docx")
+    ) {
+      return <FileTextIcon className="size-4 opacity-60" />;
+    } else if (
+      fileType.includes("zip") ||
+      fileType.includes("archive") ||
+      fileName.endsWith(".zip") ||
+      fileName.endsWith(".rar")
+    ) {
+      return <FileArchiveIcon className="size-4 opacity-60" />;
+    } else if (
+      fileType.includes("excel") ||
+      fileName.endsWith(".xls") ||
+      fileName.endsWith(".xlsx")
+    ) {
+      return <FileSpreadsheetIcon className="size-4 opacity-60" />;
+    } else if (fileType.includes("video/")) {
+      return <VideoIcon className="size-4 opacity-60" />;
+    } else if (fileType.includes("audio/")) {
+      return <HeadphonesIcon className="size-4 opacity-60" />;
+    } else if (fileType.startsWith("image/")) {
+      return <ImageIcon className="size-4 opacity-60" />;
+    }
+    return <FileIcon className="size-4 opacity-60" />;
+  };
 
   const [
     { files, isDragging, errors },
@@ -55,12 +100,12 @@ export default function CreatePostDropzone() {
       getInputProps,
     },
   ] = useFileUpload({
-    accept: "image/png,image/jpeg,image/jpg",
     multiple: true,
     maxFiles,
     maxSize,
   });
 
+  const extensions = [StarterKit];
   const createPostFormSchema = z.object({
     description: z
       .string()
@@ -168,14 +213,14 @@ export default function CreatePostDropzone() {
               <input
                 {...getInputProps()}
                 className="sr-only"
-                aria-label="Upload image file"
+                aria-label="Upload file"
               />
               <div className="flex flex-col items-center justify-center px-4 py-1 text-center">
                 <p className="mb-1.5 text-sm font-medium">
-                  Drop your images here (Max {maxFiles} images)
+                  Drop your files here (Max {maxFiles} files)
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  PNG, JPG, JPEG (max. {maxSizeMB}MB)
+                  Max {maxSizeMB}MB
                 </p>
                 <Button
                   variant="outline"
@@ -183,7 +228,7 @@ export default function CreatePostDropzone() {
                   onClick={openFileDialog}
                 >
                   <UploadIcon className="-ms-1 opacity-60" aria-hidden="true" />
-                  Select images
+                  Select files
                 </Button>
               </div>
             </div>
@@ -205,13 +250,19 @@ export default function CreatePostDropzone() {
                     className="bg-background flex items-center justify-between gap-2 rounded-lg border p-2 pe-3"
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="bg-accent aspect-square shrink-0 rounded">
-                        <img
-                          src={file.preview}
-                          alt={file.file.name}
-                          className="size-10 rounded-[inherit] object-cover"
-                        />
-                      </div>
+                      {file.file.type.startsWith("image/") ? (
+                        <div className="bg-accent aspect-square shrink-0 rounded">
+                          <img
+                            src={file.preview}
+                            alt={file.file.name}
+                            className="size-10 rounded-[inherit] object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex aspect-square size-10 shrink-0 items-center justify-center rounded border">
+                          {getFileIcon(file)}
+                        </div>
+                      )}
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <p className="truncate text-[13px] font-medium">
                           {file.file.name}
