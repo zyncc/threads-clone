@@ -13,7 +13,7 @@ export default async function Home() {
   const feed = await prisma.post.findMany({
     where: {
       userId: {
-        not: session?.user.id,
+        not: session.user.id,
       },
       user: {
         accountPrivacy: "public",
@@ -23,7 +23,7 @@ export default async function Home() {
     include: {
       likes: {
         where: {
-          userId: session?.user.id,
+          userId: session.user.id,
         },
         select: {
           userId: true,
@@ -34,14 +34,14 @@ export default async function Home() {
           userId: true,
         },
         where: {
-          userId: session?.user.id,
+          userId: session.user.id,
         },
       },
       user: {
         include: {
           followers: {
             where: {
-              followerId: session?.user.id,
+              followerId: session.user.id,
             },
           },
         },

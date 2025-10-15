@@ -18,43 +18,45 @@ export default async function AccountPage({
   const decoded = decodeURIComponent(encodedUsername);
   const username = decoded.startsWith("@") ? decoded.slice(1) : decoded;
 
-  const feed = await prisma.post.findMany({
+  const feed = await prisma.user.findUnique({
     where: {
-      user: {
-        accountPrivacy: "public",
-        username,
-      },
+      username,
     },
-    take: InfinitePostFeedSize + 1,
     include: {
-      likes: {
-        where: {
-          userId: session.user.id,
-        },
-        select: {
-          userId: true,
-        },
-      },
-      savedBy: {
-        select: {
-          userId: true,
-        },
-        where: {
-          userId: session.user.id,
-        },
-      },
-      user: {
+      Post: {
         include: {
-          followers: {
+          likes: {
             where: {
-              followerId: session.user.id,
+              userId: session.user.id,
+            },
+            select: {
+              userId: true,
+            },
+          },
+          savedBy: {
+            select: {
+              userId: true,
+            },
+            where: {
+              userId: session.user.id,
+            },
+          },
+          user: {
+            include: {
+              followers: {
+                where: {
+                  followerId: session.user.id,
+                },
+              },
             },
           },
         },
+        where: {
+          user: {
+            username,
+          },
+        },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
     },
   });
 

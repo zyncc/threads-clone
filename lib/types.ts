@@ -32,3 +32,27 @@ export type Feed = Prisma.PostGetPayload<{
     };
   };
 }>;
+
+export type AccountFeed = Prisma.UserGetPayload<{
+  include: {
+    Post: {
+      include: {
+        likes: {
+          select: {
+            userId: true,
+          },
+        },
+        savedBy: {
+          select: {
+            userId: true,
+          },
+        },
+        user: {
+          include: {
+            followers: true
+          },
+        },
+      },
+    },
+  },
+}>

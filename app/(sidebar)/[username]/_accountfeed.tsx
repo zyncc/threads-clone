@@ -15,52 +15,52 @@ import AvatarDropzone from "@/components/avatar-dropzone";
 import AccountPageDropdown from "@/components/client/account-page-dropdown";
 import Post from "@/components/ui/post";
 import { type Session } from "@/auth";
-import { type Feed } from "@/lib/types";
+import { AccountFeed, type Feed } from "@/lib/types";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
 import { InfinitePostFeedSize } from "@/lib/constants";
 
-export default function AccountFeed({
+export default function AccountFeedPage({
   session,
   feed,
   username,
 }: {
   session: Session;
-  feed: Feed[];
+  feed: AccountFeed;
   username: string;
 }) {
   const [tab, setTab] = useState("posts");
-  const {
-    data: feedData,
-    hasNextPage: accountFeedHasNextPage,
-    fetchNextPage: accountFeedNextPage,
-    isFetchingNextPage: accountFeedFetchingNextPage,
-  } = useInfiniteQuery({
-    initialData: {
-      pages: [
-        {
-          feed,
-          nextCursor:
-            feed.length > InfinitePostFeedSize
-              ? feed[feed.length - 1].id
-              : null,
-        },
-      ],
-      pageParams: [0],
-    },
-    queryKey: ["account-feed", username],
-    queryFn: async ({ pageParam }) => {
-      const response = await fetch(
-        `/api/post/account-feed?cursor=${pageParam}`,
-      );
-      const data = await response.json();
-      return data;
-    },
-    initialPageParam: 0,
-    staleTime: 1000 * 60 * 5,
-    refetchInterval: 1000 * 60 * 5,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-  });
+  // const {
+  //   data: feedData,
+  //   hasNextPage: accountFeedHasNextPage,
+  //   fetchNextPage: accountFeedNextPage,
+  //   isFetchingNextPage: accountFeedFetchingNextPage,
+  // } = useInfiniteQuery({
+  //   initialData: {
+  //     pages: [
+  //       {
+  //         feed,
+  //         nextCursor:
+  //           feed.length > InfinitePostFeedSize
+  //             ? feed[feed.length - 1].id
+  //             : null,
+  //       },
+  //     ],
+  //     pageParams: [0],
+  //   },
+  //   queryKey: ["account-feed", username],
+  //   queryFn: async ({ pageParam }) => {
+  //     const response = await fetch(
+  //       `/api/post/account-feed?cursor=${pageParam}`,
+  //     );
+  //     const data = await response.json();
+  //     return data;
+  //   },
+  //   initialPageParam: 0,
+  //   staleTime: 1000 * 60 * 5,
+  //   refetchInterval: 1000 * 60 * 5,
+  //   getNextPageParam: (lastPage) => lastPage.nextCursor,
+  // });
 
   const {
     data: savedFeedData,
@@ -86,13 +86,13 @@ export default function AccountFeed({
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 
-  const { ref: accountFeedRef } = useInView({
-    onChange: (inView) => {
-      if (inView && accountFeedHasNextPage && !accountFeedFetchingNextPage) {
-        accountFeedNextPage();
-      }
-    },
-  });
+  // const { ref: accountFeedRef } = useInView({
+  //   onChange: (inView) => {
+  //     if (inView && accountFeedHasNextPage && !accountFeedFetchingNextPage) {
+  //       accountFeedNextPage();
+  //     }
+  //   },
+  // });
 
   const { ref: savedFeedRef } = useInView({
     onChange: (inView) => {
@@ -102,8 +102,8 @@ export default function AccountFeed({
     },
   });
 
-  const InfiniteFeedData: Feed[] =
-    feedData?.pages.flatMap((page) => page.feed) || [];
+  // const InfiniteFeedData: Feed[] =
+  //   feedData?.pages.flatMap((page) => page.feed) || [];
 
   const InfiniteSavedFeedData: Feed[] =
     savedFeedData?.pages.flatMap((page) => page.feed) || [];
@@ -113,19 +113,16 @@ export default function AccountFeed({
       <div className="container mx-auto max-w-3xl space-y-4 py-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold">{feed[0].user.name}</h1>
-            <p>@{feed[0].user.username}</p>
+            <h1 className="text-2xl font-bold">{feed.name}</h1>
+            <p>@{feed.username}</p>
           </div>
           <div className="flex items-center gap-3">
             <Dialog>
               <DialogTrigger>
                 <Avatar className="group h-16 w-16 cursor-pointer hover:opacity-25">
-                  <AvatarImage
-                    src={feed[0].user.image!}
-                    alt={feed[0].user.name}
-                  />
+                  <AvatarImage src={feed.image!} alt={feed.name} />
                   <AvatarFallback>
-                    {feed[0].user.name
+                    {feed.name
                       .split(" ")
                       .map((n) => n[0])
                       .join("")}
@@ -142,9 +139,9 @@ export default function AccountFeed({
             <AccountPageDropdown />
           </div>
         </div>
-        {feed[0].user.bio && (
+        {feed.bio && (
           <div className="space-y-1">
-            {feed[0].user.bio.split("\n").map((line, index) => (
+            {feed.bio.split("\n").map((line, index) => (
               <p key={index} className="leading-relaxed">
                 {line}
               </p>
@@ -188,7 +185,7 @@ export default function AccountFeed({
       </div>
       <div>
         <Tabs defaultValue={tab} onValueChange={setTab}>
-          {session.user.username == feed[0].user.username && (
+          {session.user.username == feed.username && (
             <>
               <TabsList className="mx-auto w-full max-w-3xl">
                 <TabsTrigger value="posts">
@@ -202,7 +199,7 @@ export default function AccountFeed({
           )}
           <TabsContent value="posts">
             <div className="my-10 flex flex-col gap-5">
-              {InfiniteFeedData.map((post) => (
+              {feed.Post.map((post) => (
                 <Post
                   key={post.id}
                   user={post.user}
@@ -218,11 +215,11 @@ export default function AccountFeed({
                   ownPost={post.userId === session?.user.id}
                 />
               ))}
-              {accountFeedHasNextPage && (
+              {/* {accountFeedHasNextPage && (
                 <div ref={accountFeedRef}>
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </div>
-              )}
+              )} */}
             </div>
           </TabsContent>
           <TabsContent value="saved">

@@ -33,6 +33,7 @@ export const auth = betterAuth({
       accountPrivacy: {
         type: "string",
         required: true,
+        defaultValue: "public"
       },
     },
   },
