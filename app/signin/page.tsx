@@ -18,7 +18,7 @@ async function SuspenseWrapper() {
   }
   return (
     <main className="flex h-screen w-full items-center justify-center">
-      <div className="flex h-full w-full flex-1 basis-1/2 items-center justify-center">
+      <div className="hidden h-full w-full flex-1 basis-1/2 flex-wrap items-center justify-center lg:flex">
         <h1 className="text-h1">
           Welcome to <br />
           Threads

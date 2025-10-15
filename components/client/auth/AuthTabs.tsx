@@ -7,6 +7,9 @@ import SignUpForm from "./SignUpForm";
 export default function AuthTabs() {
   return (
     <Tabs defaultValue="signin" className="w-full">
+      <h1 className="mb-5 block text-center font-semibold lg:hidden">
+        Welcome to Threads
+      </h1>
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="signin">Sign In</TabsTrigger>
         <TabsTrigger value="signup">Sign Up</TabsTrigger>
